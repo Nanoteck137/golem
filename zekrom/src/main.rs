@@ -1,0 +1,87 @@
+use std::{
+    sync::{RwLock, Arc},
+    time::Duration,
+};
+
+use rocket::{
+    serde::{Serialize, json::Json},
+    State,
+    tokio::{spawn, time},
+};
+use sysinfo::{System, SystemExt, CpuExt};
+
+#[macro_use]
+extern crate rocket;
+
+// NOTE(patrik): Extra time for sleeping inside the update for the
+// system info (in milliseconds)
+const UPDATE_TIME_OFFSET: u64 = 500;
+
+struct MyState {
+    sys: Arc<RwLock<System>>,
+}
+
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+#[serde(rename_all = "camelCase")]
+struct SystemInfo {
+    cpu_vendor_id: String,
+    cpu_brand: String,
+    cpu_usage: f32,
+    cpu_freq: u64,
+
+    total_memory: u64,
+    free_memory: u64,
+    available_memory: u64,
+    used_memory: u64,
+
+    total_swap: u64,
+    free_swap: u64,
+    used_swap: u64,
+}
+
+#[get("/system")]
+fn system(state: &State<MyState>) -> Json<SystemInfo> {
+    let lock = state.sys.read().unwrap();
+    let cpu = lock.global_cpu_info();
+
+    Json(SystemInfo {
+        cpu_vendor_id: cpu.vendor_id().to_string(),
+        cpu_brand: cpu.brand().to_string(),
+        cpu_usage: cpu.cpu_usage(),
+        cpu_freq: cpu.frequency(),
+
+        total_memory: lock.total_memory(),
+        free_memory: lock.free_memory(),
+        available_memory: lock.available_memory(),
+        used_memory: lock.used_memory(),
+
+        total_swap: lock.total_swap(),
+        free_swap: lock.free_swap(),
+        used_swap: lock.used_swap(),
+    })
+}
+
+#[launch]
+fn rocket() -> _ {
+    let sys = Arc::new(RwLock::new(System::new_all()));
+
+    let sys_lock = sys.clone();
+    spawn(async move {
+        let mut interval = time::interval(
+            System::MINIMUM_CPU_UPDATE_INTERVAL
+                + Duration::from_millis(UPDATE_TIME_OFFSET),
+        );
+
+        loop {
+            interval.tick().await;
+            {
+                let mut t = sys_lock.write().unwrap();
+                t.refresh_all()
+            }
+        }
+    });
+
+    let state = MyState { sys };
+    rocket::build().manage(state).mount("/api", routes![system])
+}
