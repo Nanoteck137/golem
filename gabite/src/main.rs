@@ -4,10 +4,11 @@ use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use rocket::serde::json::Json;
 use rocket::tokio::{self, time};
 use rocket::State;
 use serde::de::DeserializeOwned;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use system_info::{Capabilities, SystemInfo};
 
 #[macro_use]
@@ -34,12 +35,12 @@ impl Machine {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 struct MachineData {
-    raw: SystemInfo,
+    system_info: SystemInfo,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Serialize, Clone, Debug)]
 enum MachineStatus {
     Unreachable,
     Success(MachineData),
@@ -55,10 +56,36 @@ struct ProgramState {
     machine_states: MachineStates,
 }
 
+#[derive(Serialize)]
+struct Res {
+    name: String,
+    status: String,
+    data: Option<MachineData>,
+}
+
 #[get("/")]
-fn test(program_state: &State<ProgramState>) -> String {
-    let lock = program_state.machine_states.read();
-    format!("{:?}", lock)
+fn test(program_state: &State<ProgramState>) -> Json<Vec<Res>> {
+    let lock = program_state.machine_states.read().unwrap();
+    let machines = &program_state.machines;
+
+    let mut result = Vec::new();
+
+    for (index, machine) in machines.iter().enumerate() {
+        let state = &lock[index];
+
+        let (status, data) = match state {
+            MachineStatus::Unreachable => ("Unreachable", None),
+            MachineStatus::Success(data) => ("Success", Some(data.clone())),
+        };
+
+        result.push(Res {
+            name: machine.name.clone(),
+            status: status.to_string(),
+            data,
+        });
+    }
+
+    Json(result)
 }
 
 async fn fetch_data_from_machine<T>(machine: &Machine, api: &str) -> Option<T>
@@ -74,23 +101,20 @@ where
 }
 
 async fn check_machine(program_state: &mut ProgramState) {
-    // TODO(patrik): Check for machines that is unreachable
-    // TODO(patrik): Try to get the capabilities from the machine
-    // TODO(patrik): Update the machines capabilities inside the program_state
-
     let machines = &mut program_state.machines;
 
     let mut which = Vec::new();
 
     {
-        // TODO(patrik): Remove unwrap
-        let machine_states = program_state.machine_states.read().unwrap();
+        let machine_states = program_state
+            .machine_states
+            .read()
+            .expect("Failed to get read lock on machine states");
 
         for (index, (machine, state)) in
             machines.iter().zip(machine_states.iter()).enumerate()
         {
             if let MachineStatus::Unreachable = state {
-                // TODO(patrik): Fetch capabilities
                 println!(
                     "Machine({}): '{}' is unreachable",
                     index, machine.name
@@ -127,8 +151,9 @@ async fn gather_machine_info(
                         .await;
 
                 if let Some(sys_info) = sys_info {
-                    states[index] =
-                        MachineStatus::Success(MachineData { raw: sys_info });
+                    states[index] = MachineStatus::Success(MachineData {
+                        system_info: sys_info,
+                    });
                 }
             }
         }
