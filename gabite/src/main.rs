@@ -57,7 +57,25 @@ fn test(program_state: &State<ProgramState>) -> String {
     format!("{:?}", lock)
 }
 
-async fn check_machine(_program_state: &ProgramState) {}
+async fn check_machine(program_state: &ProgramState) {
+    // TODO(patrik): Check for machines that is unreachable
+    // TODO(patrik): Try to get the capabilities from the machine
+    // TODO(patrik): Update the machines capabilities inside the program_state
+
+    // TODO(patrik): Remove unwrap
+    let machine_states = program_state.machine_states.read().unwrap();
+
+    // TODO(patrik): Remove unwrap
+    let machines = program_state.machines.write().unwrap();
+
+    for (machine, state) in machines.iter().zip(machine_states.iter()) {
+        if let MachineStatus::Unreachable = state {
+            // TODO(patrik): Fetch capabilities
+            println!("Machine: '{}' is unreachable", machine.name);
+        }
+    }
+}
+
 async fn gather_machine_info(_program_state: &ProgramState) {}
 async fn update_state(_program_state: &ProgramState) {}
 
