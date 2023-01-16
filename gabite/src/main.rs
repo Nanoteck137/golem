@@ -125,7 +125,7 @@ async fn gather_machine_info(
                 let sys_info =
                     fetch_data_from_machine::<SystemInfo>(machine, "system")
                         .await;
-                // println!("System Info: {:#?}", sys_info);
+
                 if let Some(sys_info) = sys_info {
                     states[index] =
                         MachineStatus::Success(MachineData { raw: sys_info });
@@ -143,9 +143,6 @@ fn update_state(program_state: &ProgramState, states: Vec<MachineStatus>) {
 }
 
 async fn fetch(program_state: &mut ProgramState) {
-    // let mut handles = Vec::new();
-    // println!("Machines: {:#?}", program_state.machines);
-
     // If the machines is unreachable then we need to try to get
     // the capabilities, if this failes then try again on next iteration
     // If the machines is not unreachable then we assume the capabilities
@@ -154,10 +151,6 @@ async fn fetch(program_state: &mut ProgramState) {
     check_machine(program_state).await;
     let states = gather_machine_info(program_state).await;
     update_state(program_state, states);
-
-    // TODO(patrik): check_machine()
-    // TODO(patrik): gather_machine_info()
-    // TODO(patrik): update_state()
 }
 
 fn read_file<P>(filepath: P) -> String
