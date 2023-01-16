@@ -406,7 +406,6 @@ dependencies = [
 name = "gabite"
 version = "0.1.0"
 dependencies = [
- "rand",
  "reqwest",
  "rocket",
  "serde",

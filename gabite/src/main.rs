@@ -4,11 +4,13 @@ use std::path::Path;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
-use rand::Rng;
 use rocket::tokio::{self, time};
 use rocket::State;
 use serde::Deserialize;
 use system_info::SystemInfo;
+
+#[macro_use]
+extern crate rocket;
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -44,9 +46,6 @@ type Test = Arc<RwLock<Vec<Option<MachineStatus>>>>;
 struct ProgramState {
     test: Test,
 }
-
-#[macro_use]
-extern crate rocket;
 
 #[get("/")]
 fn test(program_state: &State<ProgramState>) -> String {
