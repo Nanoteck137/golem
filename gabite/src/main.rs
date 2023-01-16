@@ -125,10 +125,11 @@ async fn gather_machine_info(
                 let sys_info =
                     fetch_data_from_machine::<SystemInfo>(machine, "system")
                         .await;
-                println!("System Info: {:#?}", sys_info);
-                states[index] = MachineStatus::Success(MachineData {
-                    raw: sys_info.unwrap(),
-                });
+                // println!("System Info: {:#?}", sys_info);
+                if let Some(sys_info) = sys_info {
+                    states[index] =
+                        MachineStatus::Success(MachineData { raw: sys_info });
+                }
             }
         }
     }
@@ -136,15 +137,14 @@ async fn gather_machine_info(
     states
 }
 
-async fn update_state(
-    _program_state: &ProgramState,
-    states: Vec<MachineStatus>,
-) {
+fn update_state(program_state: &ProgramState, states: Vec<MachineStatus>) {
+    let mut lock = program_state.machine_states.write().unwrap();
+    *lock = states;
 }
 
 async fn fetch(program_state: &mut ProgramState) {
     // let mut handles = Vec::new();
-    println!("Machines: {:#?}", program_state.machines);
+    // println!("Machines: {:#?}", program_state.machines);
 
     // If the machines is unreachable then we need to try to get
     // the capabilities, if this failes then try again on next iteration
@@ -153,7 +153,7 @@ async fn fetch(program_state: &mut ProgramState) {
 
     check_machine(program_state).await;
     let states = gather_machine_info(program_state).await;
-    update_state(program_state, states).await;
+    update_state(program_state, states);
 
     // TODO(patrik): check_machine()
     // TODO(patrik): gather_machine_info()
