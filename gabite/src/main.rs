@@ -41,7 +41,7 @@ enum MachineStatus {
     Success(MachineData),
 }
 
-type Test = Arc<RwLock<Vec<Option<MachineStatus>>>>;
+type Test = Arc<RwLock<Vec<MachineStatus>>>;
 
 struct ProgramState {
     test: Test,
@@ -97,7 +97,7 @@ async fn fetch(machines: &Vec<Machine>, test: &Test) {
     {
         let mut lock = test.write().unwrap();
         for (index, res) in results {
-            lock[index] = Some(res);
+            lock[index] = res;
         }
     }
 }
@@ -124,7 +124,7 @@ fn rocket() -> _ {
     println!("Config: {:#?}", config);
 
     let program_state = {
-        let arr = vec![None; config.machines.len()];
+        let arr = vec![MachineStatus::Unreachable; config.machines.len()];
         let test = Test::new(RwLock::new(arr));
         ProgramState { test }
     };
