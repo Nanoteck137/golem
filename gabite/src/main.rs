@@ -41,65 +41,90 @@ enum MachineStatus {
     Success(MachineData),
 }
 
-type Test = Arc<RwLock<Vec<MachineStatus>>>;
+type Machines = Arc<RwLock<Vec<Machine>>>;
+type MachineStates = Arc<RwLock<Vec<MachineStatus>>>;
 
+#[derive(Clone)]
 struct ProgramState {
-    test: Test,
+    num_machines: usize,
+    machines: Machines,
+    machine_states: MachineStates,
 }
 
 #[get("/")]
 fn test(program_state: &State<ProgramState>) -> String {
-    let lock = program_state.test.read();
+    let lock = program_state.machine_states.read();
     format!("{:?}", lock)
 }
 
-async fn fetch(machines: &Vec<Machine>, test: &Test) {
-    let mut handles = Vec::new();
+async fn check_machine(_program_state: &ProgramState) {}
+async fn gather_machine_info(_program_state: &ProgramState) {}
+async fn update_state(_program_state: &ProgramState) {}
 
-    for (index, machine) in machines.iter().enumerate() {
-        let machine_name = machine.name.clone();
-        let machine_url = machine.api_url();
+async fn fetch(program_state: &ProgramState) {
+    // let mut handles = Vec::new();
 
-        let handle = tokio::spawn(async move {
-            let url = format!("{machine_url}/system");
-            // println!("URL: {}", url);
-            match reqwest::get(&url).await {
-                Ok(res) => {
-                    println!("{} {}: {:?}", machine_name, url, res);
-                    let info = res.json::<SystemInfo>().await.unwrap();
-                    return (
-                        index,
-                        MachineStatus::Success(MachineData { raw: info }),
-                    );
-                }
+    // If the machines is unreachable then we need to try to get
+    // the capabilities, if this failes then try again on next iteration
+    // If the machines is not unreachable then we assume the capabilities
+    // we have is still valid
 
-                Err(e) => {
-                    if e.is_connect() {
-                        println!("{}: Failed to connect", machine_name);
-                    } else {
-                        println!("Unknown error");
-                    }
+    check_machine(program_state).await;
+    gather_machine_info(program_state).await;
+    update_state(program_state).await;
 
-                    return (index, MachineStatus::Unreachable);
-                }
-            }
-        });
-
-        handles.push(handle);
-    }
-
-    let mut results = Vec::new();
-    for handle in handles {
-        let res = handle.await.unwrap();
-        results.push(res);
-    }
+    // TODO(patrik): check_machine()
+    // TODO(patrik): gather_machine_info()
+    // TODO(patrik): update_state()
 
     {
-        let mut lock = test.write().unwrap();
-        for (index, res) in results {
-            lock[index] = res;
-        }
+
+        // let machines = program_state.machines.read().unwrap();
+        // for (index, machine) in machines.iter().enumerate() {
+        //     let machine_name = machine.name.clone();
+        //     let machine_url = machine.api_url();
+        //
+        //     let handle = tokio::spawn(async move {
+        //         let url = format!("{machine_url}/system");
+        //         // println!("URL: {}", url);
+        //         match reqwest::get(&url).await {
+        //             Ok(res) => {
+        //                 println!("{} {}: {:?}", machine_name, url, res);
+        //                 let info = res.json::<SystemInfo>().await.unwrap();
+        //                 return (
+        //                     index,
+        //                     MachineStatus::Success(MachineData { raw: info }),
+        //                 );
+        //             }
+        //
+        //             Err(e) => {
+        //                 if e.is_connect() {
+        //                     println!("{}: Failed to connect", machine_name);
+        //                 } else {
+        //                     println!("Unknown error");
+        //                 }
+        //
+        //                 return (index, MachineStatus::Unreachable);
+        //             }
+        //         }
+        //     });
+        //
+        //     handles.push(handle);
+        // }
     }
+
+    // let mut results = Vec::new();
+    // for handle in handles {
+    //     let res = handle.await.unwrap();
+    //     results.push(res);
+    // }
+
+    // {
+    //     let mut lock = program_state.machine_states.write().unwrap();
+    //     for (index, res) in results {
+    //         lock[index] = res;
+    //     }
+    // }
 }
 
 fn read_file<P>(filepath: P) -> String
@@ -123,19 +148,25 @@ fn rocket() -> _ {
 
     println!("Config: {:#?}", config);
 
-    let program_state = {
-        let arr = vec![MachineStatus::Unreachable; config.machines.len()];
-        let test = Test::new(RwLock::new(arr));
-        ProgramState { test }
+    let num_machines = config.machines.len();
+    let machines = Machines::new(RwLock::new(config.machines));
+    let machine_states = MachineStates::new(RwLock::new(vec![
+        MachineStatus::Unreachable;
+        num_machines
+    ]));
+
+    let program_state = ProgramState {
+        num_machines,
+        machines,
+        machine_states,
     };
 
-    let machines = config.machines.clone();
-    let test = program_state.test.clone();
+    let p = program_state.clone();
     tokio::spawn(async move {
         let mut interval = time::interval(Duration::from_secs(5));
         loop {
             interval.tick().await;
-            fetch(&machines, &test).await;
+            fetch(&p).await;
         }
     });
 
