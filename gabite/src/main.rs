@@ -1,9 +1,12 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
+use rand::Rng;
 use rocket::tokio::{self, time};
+use rocket::State;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
@@ -11,25 +14,87 @@ struct Config {
     machines: Vec<Machine>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Clone, Debug)]
 struct Machine {
     name: String,
     ip: String,
     api_port: u16,
 }
 
-struct MachineData {}
+impl Machine {
+    fn api_url(&self) -> String {
+        format!("http://{}:{}/api", self.ip, self.api_port)
+    }
+}
+
+struct MachineData {
+    cpu_brand: String,
+}
+
+#[derive(Clone, Debug)]
+enum MachineStatus {
+    Unreachable,
+    Success,
+}
+
+type Test = Arc<RwLock<Vec<Option<MachineStatus>>>>;
+
+struct ProgramState {
+    test: Test,
+}
 
 #[macro_use]
 extern crate rocket;
 
 #[get("/")]
-fn test() -> String {
-    format!("Test")
+fn test(program_state: &State<ProgramState>) -> String {
+    let lock = program_state.test.read();
+    format!("{:?}", lock)
 }
 
-fn fetch() {
-    // println!("Fetch Data from machines");
+async fn fetch(machines: &Vec<Machine>, test: &Test) {
+    let mut handles = Vec::new();
+
+    for (index, machine) in machines.iter().enumerate() {
+        let machine_name = machine.name.clone();
+        let machine_url = machine.api_url();
+
+        let handle = tokio::spawn(async move {
+            let url = format!("{machine_url}/system");
+            // println!("URL: {}", url);
+            match reqwest::get(&url).await {
+                Ok(res) => {
+                    println!("{} {}: {:?}", machine_name, url, res);
+                    return (index, MachineStatus::Success);
+                }
+
+                Err(e) => {
+                    if e.is_connect() {
+                        println!("{}: Failed to connect", machine_name);
+                    } else {
+                        println!("Unknown error");
+                    }
+
+                    return (index, MachineStatus::Unreachable);
+                }
+            }
+        });
+
+        handles.push(handle);
+    }
+
+    let mut results = Vec::new();
+    for handle in handles {
+        let res = handle.await.unwrap();
+        results.push(res);
+    }
+
+    {
+        let mut lock = test.write().unwrap();
+        for (index, res) in results {
+            lock[index] = Some(res);
+        }
+    }
 }
 
 fn read_file<P>(filepath: P) -> String
@@ -53,13 +118,23 @@ fn rocket() -> _ {
 
     println!("Config: {:#?}", config);
 
+    let program_state = {
+        let arr = vec![None; config.machines.len()];
+        let test = Test::new(RwLock::new(arr));
+        ProgramState { test }
+    };
+
+    let machines = config.machines.clone();
+    let test = program_state.test.clone();
     tokio::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(1));
+        let mut interval = time::interval(Duration::from_secs(5));
         loop {
             interval.tick().await;
-            fetch();
+            fetch(&machines, &test).await;
         }
     });
 
-    rocket::build().mount("/test", routes![test])
+    rocket::build()
+        .manage(program_state)
+        .mount("/test", routes![test])
 }
