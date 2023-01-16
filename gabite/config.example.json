@@ -1,0 +1,9 @@
+{
+  "machines": [
+    {
+      "name": "Some Machine",
+      "ip": "192.168.1.1",
+      "api_port": 8001
+    }
+  ]
+}
