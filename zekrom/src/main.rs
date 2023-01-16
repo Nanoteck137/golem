@@ -42,8 +42,8 @@ struct SystemInfo {
 
 #[get("/system")]
 fn system(state: &State<MyState>) -> Json<SystemInfo> {
-    let lock = state.sys.read().unwrap();
-    let cpu = lock.global_cpu_info();
+    let sys_lock = state.sys.read().unwrap();
+    let cpu = sys_lock.global_cpu_info();
 
     Json(SystemInfo {
         cpu_vendor_id: cpu.vendor_id().to_string(),
@@ -51,14 +51,14 @@ fn system(state: &State<MyState>) -> Json<SystemInfo> {
         cpu_usage: cpu.cpu_usage(),
         cpu_freq: cpu.frequency(),
 
-        total_memory: lock.total_memory(),
-        free_memory: lock.free_memory(),
-        available_memory: lock.available_memory(),
-        used_memory: lock.used_memory(),
+        total_memory: sys_lock.total_memory(),
+        free_memory: sys_lock.free_memory(),
+        available_memory: sys_lock.available_memory(),
+        used_memory: sys_lock.used_memory(),
 
-        total_swap: lock.total_swap(),
-        free_swap: lock.free_swap(),
-        used_swap: lock.used_swap(),
+        total_swap: sys_lock.total_swap(),
+        free_swap: sys_lock.free_swap(),
+        used_swap: sys_lock.used_swap(),
     })
 }
 
