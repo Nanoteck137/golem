@@ -2,6 +2,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct Capabilities {
+    pub has_system_info: bool,
+    pub has_docker_info: bool,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
     pub cpu_vendor_id: String,
     pub cpu_brand: String,
