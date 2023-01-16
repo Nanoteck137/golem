@@ -1,14 +1,11 @@
-use std::{
-    sync::{RwLock, Arc},
-    time::Duration,
-};
+use std::sync::{Arc, RwLock};
+use std::time::Duration;
 
-use rocket::{
-    serde::{Serialize, json::Json},
-    State,
-    tokio::{spawn, time},
-};
-use sysinfo::{System, SystemExt, CpuExt};
+use rocket::serde::json::Json;
+use rocket::serde::Serialize;
+use rocket::tokio::{spawn, time};
+use rocket::State;
+use sysinfo::{CpuExt, System, SystemExt};
 
 #[macro_use]
 extern crate rocket;
@@ -69,8 +66,8 @@ fn rocket() -> _ {
     let sys_lock = sys.clone();
     spawn(async move {
         let mut interval = time::interval(
-            System::MINIMUM_CPU_UPDATE_INTERVAL
-                + Duration::from_millis(UPDATE_TIME_OFFSET),
+            System::MINIMUM_CPU_UPDATE_INTERVAL +
+                Duration::from_millis(UPDATE_TIME_OFFSET),
         );
 
         loop {
