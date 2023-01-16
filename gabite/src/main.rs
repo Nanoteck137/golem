@@ -27,14 +27,33 @@ impl Machine {
     }
 }
 
+#[derive(Clone, Debug)]
 struct MachineData {
+    raw: RawSystemInfo,
+}
+
+#[derive(Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+struct RawSystemInfo {
+    cpu_vendor_id: String,
     cpu_brand: String,
+    cpu_usage: f32,
+    cpu_freq: u64,
+
+    total_memory: u64,
+    free_memory: u64,
+    available_memory: u64,
+    used_memory: u64,
+
+    total_swap: u64,
+    free_swap: u64,
+    used_swap: u64,
 }
 
 #[derive(Clone, Debug)]
 enum MachineStatus {
     Unreachable,
-    Success,
+    Success(MachineData),
 }
 
 type Test = Arc<RwLock<Vec<Option<MachineStatus>>>>;
@@ -65,7 +84,11 @@ async fn fetch(machines: &Vec<Machine>, test: &Test) {
             match reqwest::get(&url).await {
                 Ok(res) => {
                     println!("{} {}: {:?}", machine_name, url, res);
-                    return (index, MachineStatus::Success);
+                    let info = res.json::<RawSystemInfo>().await.unwrap();
+                    return (
+                        index,
+                        MachineStatus::Success(MachineData { raw: info }),
+                    );
                 }
 
                 Err(e) => {
