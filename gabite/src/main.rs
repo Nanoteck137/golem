@@ -8,6 +8,7 @@ use rand::Rng;
 use rocket::tokio::{self, time};
 use rocket::State;
 use serde::Deserialize;
+use system_info::SystemInfo;
 
 #[derive(Deserialize, Debug)]
 struct Config {
@@ -29,25 +30,7 @@ impl Machine {
 
 #[derive(Clone, Debug)]
 struct MachineData {
-    raw: RawSystemInfo,
-}
-
-#[derive(Deserialize, Clone, Debug)]
-#[serde(rename_all = "camelCase")]
-struct RawSystemInfo {
-    cpu_vendor_id: String,
-    cpu_brand: String,
-    cpu_usage: f32,
-    cpu_freq: u64,
-
-    total_memory: u64,
-    free_memory: u64,
-    available_memory: u64,
-    used_memory: u64,
-
-    total_swap: u64,
-    free_swap: u64,
-    used_swap: u64,
+    raw: SystemInfo,
 }
 
 #[derive(Clone, Debug)]
@@ -84,7 +67,7 @@ async fn fetch(machines: &Vec<Machine>, test: &Test) {
             match reqwest::get(&url).await {
                 Ok(res) => {
                     println!("{} {}: {:?}", machine_name, url, res);
-                    let info = res.json::<RawSystemInfo>().await.unwrap();
+                    let info = res.json::<SystemInfo>().await.unwrap();
                     return (
                         index,
                         MachineStatus::Success(MachineData { raw: info }),

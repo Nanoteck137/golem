@@ -411,6 +411,7 @@ dependencies = [
  "rocket",
  "serde",
  "serde_json",
+ "system_info",
 ]
 
 [[package]]
@@ -1382,6 +1383,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
+]
+
+[[package]]
+name = "system_info"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

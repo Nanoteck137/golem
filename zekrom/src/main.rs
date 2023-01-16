@@ -2,10 +2,10 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use rocket::serde::json::Json;
-use rocket::serde::Serialize;
 use rocket::tokio::{spawn, time};
 use rocket::State;
 use sysinfo::{CpuExt, System, SystemExt};
+use system_info::SystemInfo;
 
 #[macro_use]
 extern crate rocket;
@@ -16,25 +16,6 @@ const UPDATE_TIME_OFFSET: u64 = 500;
 
 struct MyState {
     sys: Arc<RwLock<System>>,
-}
-
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-#[serde(rename_all = "camelCase")]
-struct SystemInfo {
-    cpu_vendor_id: String,
-    cpu_brand: String,
-    cpu_usage: f32,
-    cpu_freq: u64,
-
-    total_memory: u64,
-    free_memory: u64,
-    available_memory: u64,
-    used_memory: u64,
-
-    total_swap: u64,
-    free_swap: u64,
-    used_swap: u64,
 }
 
 #[get("/system")]
