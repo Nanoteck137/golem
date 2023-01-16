@@ -14,6 +14,17 @@ use system_info::{Capabilities, SystemInfo};
 #[macro_use]
 extern crate rocket;
 
+// TODO(patrik):
+//   - Add icons to the machines
+//   - Serve static files for the icons so that the frontend can load them
+
+// NOTE(patrik): Routes
+//   - GET /api/machines
+//     - Get basic infomation about all of the machines registered by
+//       the backend
+//   - GET /api/machine/:id
+//     - Get full infomation about the machine
+
 #[derive(Deserialize, Debug)]
 struct Config {
     machines: Vec<Machine>,
