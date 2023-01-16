@@ -5,7 +5,7 @@ use rocket::serde::json::Json;
 use rocket::tokio::{spawn, time};
 use rocket::State;
 use sysinfo::{CpuExt, System, SystemExt};
-use system_info::SystemInfo;
+use system_info::{Capabilities, SystemInfo};
 
 #[macro_use]
 extern crate rocket;
@@ -16,6 +16,14 @@ const UPDATE_TIME_OFFSET: u64 = 500;
 
 struct MyState {
     sys: Arc<RwLock<System>>,
+}
+
+#[get("/capabilities")]
+fn capabilities() -> Json<Capabilities> {
+    Json(Capabilities {
+        has_system_info: true,
+        has_docker_info: false,
+    })
 }
 
 #[get("/system")]
@@ -61,5 +69,7 @@ fn rocket() -> _ {
     });
 
     let state = MyState { sys };
-    rocket::build().manage(state).mount("/api", routes![system])
+    rocket::build()
+        .manage(state)
+        .mount("/api", routes![capabilities, system])
 }
