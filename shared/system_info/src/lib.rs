@@ -9,11 +9,20 @@ pub struct Capabilities {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
+pub struct CpuCoreInfo {
+    pub name: String,
+    pub cpu_usage: f32,
+    pub cpu_freq: u64,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
 pub struct SystemInfo {
     pub cpu_vendor_id: String,
     pub cpu_brand: String,
     pub cpu_usage: f32,
     pub cpu_freq: u64,
+    pub cpu_cores: Vec<CpuCoreInfo>,
 
     pub total_memory: u64,
     pub free_memory: u64,

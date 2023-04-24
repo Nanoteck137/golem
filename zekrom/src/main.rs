@@ -1,18 +1,18 @@
+use std::net::Ipv4Addr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use rocket::serde::json::Json;
-use rocket::tokio::{spawn, time};
-use rocket::State;
+use rocket::{Config, State};
 use sysinfo::{CpuExt, System, SystemExt};
-use system_info::{Capabilities, SystemInfo};
+use system_info::{Capabilities, CpuCoreInfo, SystemInfo};
 
 #[macro_use]
 extern crate rocket;
 
 // NOTE(patrik): Extra time for sleeping inside the update for the
 // system info (in milliseconds)
-const UPDATE_TIME_OFFSET: u64 = 500;
+const UPDATE_TIME: u64 = 500;
 
 struct MyState {
     sys: Arc<RwLock<System>>,
@@ -31,11 +31,22 @@ fn system(state: &State<MyState>) -> Json<SystemInfo> {
     let sys_lock = state.sys.read().unwrap();
     let cpu = sys_lock.global_cpu_info();
 
+    let cores = sys_lock
+        .cpus()
+        .iter()
+        .map(|cpu| CpuCoreInfo {
+            name: cpu.name().to_string(),
+            cpu_usage: cpu.cpu_usage(),
+            cpu_freq: cpu.frequency(),
+        })
+        .collect::<Vec<_>>();
+
     Json(SystemInfo {
         cpu_vendor_id: cpu.vendor_id().to_string(),
         cpu_brand: cpu.brand().to_string(),
         cpu_usage: cpu.cpu_usage(),
         cpu_freq: cpu.frequency(),
+        cpu_cores: cores,
 
         total_memory: sys_lock.total_memory(),
         free_memory: sys_lock.free_memory(),
@@ -48,28 +59,30 @@ fn system(state: &State<MyState>) -> Json<SystemInfo> {
     })
 }
 
+fn fetch_update(sys: Arc<RwLock<System>>) {
+    loop {
+        {
+            let mut lock = sys.write().unwrap();
+            lock.refresh_all();
+        }
+        std::thread::sleep(Duration::from_millis(UPDATE_TIME));
+    }
+}
+
 #[launch]
 fn rocket() -> _ {
     let sys = Arc::new(RwLock::new(System::new_all()));
 
-    // let sys_lock = sys.clone();
-    // spawn(async move {
-    //     let mut interval = time::interval(
-    //         System::MINIMUM_CPU_UPDATE_INTERVAL +
-    //             Duration::from_millis(UPDATE_TIME_OFFSET),
-    //     );
-    //
-    //     loop {
-    //         interval.tick().await;
-    //         {
-    //             let mut t = sys_lock.write().unwrap();
-    //             t.refresh_all()
-    //         }
-    //     }
-    // });
+    let sys_lock = sys.clone();
+    std::thread::spawn(move || fetch_update(sys_lock));
+
+    let config = Config {
+        address: Ipv4Addr::new(0, 0, 0, 0).into(),
+        ..Default::default()
+    };
 
     let state = MyState { sys };
-    rocket::build()
+    rocket::custom(config)
         .manage(state)
         .mount("/api", routes![capabilities, system])
 }
