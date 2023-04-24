@@ -5,7 +5,6 @@ use std::sync::{Arc, RwLock};
 use std::time::Duration;
 
 use rocket::serde::json::Json;
-use rocket::tokio::{self, time};
 use rocket::State;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -99,19 +98,19 @@ fn test(program_state: &State<ProgramState>) -> Json<Vec<Res>> {
     Json(result)
 }
 
-async fn fetch_data_from_machine<T>(machine: &Machine, api: &str) -> Option<T>
+fn fetch_data_from_machine<T>(machine: &Machine, api: &str) -> Option<T>
 where
     T: DeserializeOwned,
 {
     let url = format!("{}/{}", machine.api_url(), api);
 
-    match reqwest::get(&url).await {
-        Ok(res) => Some(res.json::<T>().await.unwrap()),
+    match reqwest::blocking::get(&url) {
+        Ok(res) => Some(res.json::<T>().unwrap()),
         Err(_) => None,
     }
 }
 
-async fn check_machine(program_state: &mut ProgramState) {
+fn check_machine(program_state: &mut ProgramState) {
     let machines = &mut program_state.machines;
 
     let mut which = Vec::new();
@@ -139,16 +138,13 @@ async fn check_machine(program_state: &mut ProgramState) {
         let cap = fetch_data_from_machine::<Capabilities>(
             &machines[index],
             "capabilities",
-        )
-        .await;
+        );
 
         machines[index].cap = cap;
     }
 }
 
-async fn gather_machine_info(
-    program_state: &ProgramState,
-) -> Vec<MachineStatus> {
+fn gather_machine_info(program_state: &ProgramState) -> Vec<MachineStatus> {
     let machines = &program_state.machines;
 
     let mut states =
@@ -158,8 +154,7 @@ async fn gather_machine_info(
         if let Some(cap) = &machine.cap {
             if cap.has_system_info {
                 let sys_info =
-                    fetch_data_from_machine::<SystemInfo>(machine, "system")
-                        .await;
+                    fetch_data_from_machine::<SystemInfo>(machine, "system");
 
                 if let Some(sys_info) = sys_info {
                     states[index] = MachineStatus::Success(MachineData {
@@ -178,14 +173,14 @@ fn update_state(program_state: &ProgramState, states: Vec<MachineStatus>) {
     *lock = states;
 }
 
-async fn fetch(program_state: &mut ProgramState) {
+fn fetch(program_state: &mut ProgramState) {
     // If the machines is unreachable then we need to try to get
     // the capabilities, if this failes then try again on next iteration
     // If the machines is not unreachable then we assume the capabilities
     // we have is still valid
 
-    check_machine(program_state).await;
-    let states = gather_machine_info(program_state).await;
+    check_machine(program_state);
+    let states = gather_machine_info(program_state);
     update_state(program_state, states);
 }
 
@@ -224,12 +219,9 @@ fn rocket() -> _ {
     };
 
     let mut p = program_state.clone();
-    tokio::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(5));
-        loop {
-            interval.tick().await;
-            fetch(&mut p).await;
-        }
+    std::thread::spawn(move || loop {
+        fetch(&mut p);
+        std::thread::sleep(Duration::from_secs(1));
     });
 
     rocket::build()
