@@ -52,21 +52,21 @@ fn system(state: &State<MyState>) -> Json<SystemInfo> {
 fn rocket() -> _ {
     let sys = Arc::new(RwLock::new(System::new_all()));
 
-    let sys_lock = sys.clone();
-    spawn(async move {
-        let mut interval = time::interval(
-            System::MINIMUM_CPU_UPDATE_INTERVAL +
-                Duration::from_millis(UPDATE_TIME_OFFSET),
-        );
-
-        loop {
-            interval.tick().await;
-            {
-                let mut t = sys_lock.write().unwrap();
-                t.refresh_all()
-            }
-        }
-    });
+    // let sys_lock = sys.clone();
+    // spawn(async move {
+    //     let mut interval = time::interval(
+    //         System::MINIMUM_CPU_UPDATE_INTERVAL +
+    //             Duration::from_millis(UPDATE_TIME_OFFSET),
+    //     );
+    //
+    //     loop {
+    //         interval.tick().await;
+    //         {
+    //             let mut t = sys_lock.write().unwrap();
+    //             t.refresh_all()
+    //         }
+    //     }
+    // });
 
     let state = MyState { sys };
     rocket::build()
