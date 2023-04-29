@@ -23,7 +23,7 @@ const Card = (props: { onClick?: () => void }) => {
   );
 };
 
-function ProgressBar(props: { progress: number }) {
+const ProgressBar = (props: { progress: number }) => {
   return (
     <div className="w-full h-2.5 rounded-sm bg-gray-700">
       <div
@@ -32,9 +32,9 @@ function ProgressBar(props: { progress: number }) {
       ></div>
     </div>
   );
-}
+};
 
-function MachineInfoModal(props: { open: boolean; close: () => void }) {
+const MachineInfoModal = (props: { open: boolean; close: () => void }) => {
   return (
     <Dialog open={props.open} onClose={props.close} className="relative z-50">
       <div className="fixed inset-0 bg-black/60" aria-hidden="true" />
@@ -113,15 +113,14 @@ function MachineInfoModal(props: { open: boolean; close: () => void }) {
       </div>
     </Dialog>
   );
+};
+
+async function fetchMachines() {
+  const data = await fetch("http://localhost:8000/api/system");
+  return await data.json();
 }
 
-function fetchMachines() {
-  return fetch("http://localhost:8000/api/system")
-    .then((data) => data.json())
-    .then((data) => data);
-}
-
-export function App() {
+export const App = () => {
   const [isOpen, setOpen] = useState(false);
 
   const { data } = useQuery({ queryKey: ["machines"], queryFn: fetchMachines });
@@ -150,4 +149,4 @@ export function App() {
       />
     </div>
   );
-}
+};
